@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String          @id @default(uuid())
+  email             String          @unique
+  username          String?         @unique
+  password          String
+  firstName         String?
+  lastName          String?
+  phone             String?
+  photo             String?
+  isProfileComplete Boolean         @default(false)
+  balance           Decimal         @default(0) @db.Decimal(20, 2)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  bio               String?
+  idNumber          String?
+  kycStatus         KycStatus       @default(PENDING)
+  paymentPin        String?
+  pushToken         String?
+  role              Role            @default(USER)
+  isActive          Boolean         @default(true)
+  escrowsAsBuyer    Escrow[]        @relation("BuyerEscrows")
+  escrowsAsSeller   Escrow[]        @relation("SellerEscrows")
+  notifications     Notification[]
+  supportTickets    SupportTicket[]
+  transactions      Transaction[]
+
+  @@index([username])
+  @@index([email])
+}
+
+model Escrow {
+  id                    String        @id @default(uuid())
+  title                 String
+  description           String?
+  amount                Decimal       @db.Decimal(20, 2)
+  status                EscrowStatus  @default(PENDING)
+  startDate             DateTime?
+  deadline              DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  buyerId               String
+  sellerId              String
+  disputeReason         String?
+  fee                   Decimal       @default(0) @db.Decimal(20, 2)
+  deadlineNotified24h   Boolean       @default(false)
+  lastPaymentReminderAt DateTime?
+  lastTaskReminderAt    DateTime?
+  buyer                 User          @relation("BuyerEscrows", fields: [buyerId], references: [id])
+  seller                User          @relation("SellerEscrows", fields: [sellerId], references: [id])
+  transactions          Transaction[]
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  amount        Decimal           @db.Decimal(20, 2)
+  type          TransactionType
+  status        TransactionStatus @default(PENDING)
+  externalRef   String?           @unique
+  flutterwaveId String?           @unique
+  createdAt     DateTime          @default(now())
+  userId        String
+  escrowId      String?
+  escrow        Escrow?           @relation(fields: [escrowId], references: [id])
+  user          User              @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model SupportTicket {
+  id          String         @id @default(uuid())
+  ticketId    String         @unique @default(cuid())
+  category    TicketCategory
+  subject     String
+  message     String
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  adminReply  String?
+  isEscalated Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  userId      String
+  user        User           @relation(fields: [userId], references: [id])
+}
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPPORT
+  BANNED
+}
+
+enum KycStatus {
+  NONE
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum EscrowStatus {
+  PENDING
+  ACCEPTED
+  FUNDED
+  COMPLETED
+  RELEASED
+  DISPUTED
+  CANCELLED
+  REJECTED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  ESCROW_RELEASE
+  ESCROW_REFUND
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketCategory {
+  ACCOUNT
+  TRANSACTION
+  DISPUTE
+  TECHNICAL
+  OTHER
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
