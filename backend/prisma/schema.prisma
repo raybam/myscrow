@@ -22,11 +22,16 @@ model User {
   updatedAt         DateTime        @updatedAt
   bio               String?
   idNumber          String?
-  kycStatus         KycStatus       @default(PENDING)
-  paymentPin        String?
-  pushToken         String?
-  role              Role            @default(USER)
-  isActive          Boolean         @default(true)
+  kycStatus           KycStatus       @default(NONE)
+  paymentPin          String?
+  pushToken           String?
+  otpCode             String?
+  otpExpiresAt        DateTime?
+  resetPasswordToken  String?
+  resetPasswordExpires DateTime?
+  isEmailVerified     Boolean         @default(false)
+  role                Role            @default(USER)
+  isActive            Boolean         @default(true)
   escrowsAsBuyer    Escrow[]        @relation("BuyerEscrows")
   escrowsAsSeller   Escrow[]        @relation("SellerEscrows")
   notifications     Notification[]
@@ -54,6 +59,9 @@ model Escrow {
   deadlineNotified24h   Boolean       @default(false)
   lastPaymentReminderAt DateTime?
   lastTaskReminderAt    DateTime?
+  documents             Json?
+  isDeletedByBuyer      Boolean       @default(false)
+  isDeletedBySeller     Boolean       @default(false)
   buyer                 User          @relation("BuyerEscrows", fields: [buyerId], references: [id])
   seller                User          @relation("SellerEscrows", fields: [sellerId], references: [id])
   transactions          Transaction[]

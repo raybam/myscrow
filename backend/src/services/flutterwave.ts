@@ -157,3 +157,30 @@ export const initiateTransfer = async (data: TransferData) => {
         throw new Error(error.message || 'Failed to initiate transfer');
     }
 };
+
+export const resolveAccount = async (account_number: string, account_bank: string) => {
+    try {
+        const response = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+            },
+            body: JSON.stringify({
+                account_number,
+                account_bank,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+
+        const responseData = await response.json();
+        return responseData;
+    } catch (error: any) {
+        console.error('Flutterwave account resolution error:', error.message);
+        throw new Error(error.message || 'Failed to resolve account');
+    }
+};

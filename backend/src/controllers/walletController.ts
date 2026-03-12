@@ -165,3 +165,25 @@ export const withdrawFunds = async (req: AuthRequest, res: Response) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 };
+
+export const resolveBankDetails = async (req: AuthRequest, res: Response) => {
+    try {
+        const { accountNumber, bankCode } = req.body;
+
+        if (!accountNumber || !bankCode) {
+            return res.status(400).json({ message: 'Account number and bank code are required' });
+        }
+
+        const response = await flutterwave.resolveAccount(accountNumber, bankCode);
+
+        res.json({
+            message: 'Account resolved',
+            data: response.data
+        });
+    } catch (error: any) {
+        console.error('[Wallet] Account resolution error:', error);
+        res.status(400).json({
+            message: error.message || 'Failed to resolve bank account details'
+        });
+    }
+};

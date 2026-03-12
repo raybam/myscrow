@@ -8,7 +8,7 @@ import { checkLimits } from '../utils/limits';
 
 export const createEscrow = async (req: AuthRequest, res: Response) => {
     try {
-        const { title, description, amount, counterpartyId, creatorRole, buyerId, sellerId, deadline } = req.body;
+        const { title, description, amount, counterpartyId, creatorRole, buyerId, sellerId, deadline, documents } = req.body;
 
         if (!title || !amount) {
             return res.status(400).json({ message: 'Title and amount are required' });
@@ -48,6 +48,7 @@ export const createEscrow = async (req: AuthRequest, res: Response) => {
                 buyerId: finalBuyerId,
                 sellerId: finalSellerId,
                 deadline: deadline ? new Date(deadline) : null,
+                documents: documents || undefined,
                 status: 'PENDING',
             },
         });
@@ -78,14 +79,14 @@ export const getEscrows = async (req: AuthRequest, res: Response) => {
         const escrows = await prisma.escrow.findMany({
             where: {
                 OR: [
-                    { buyerId: req.userId },
-                    { sellerId: req.userId },
+                    { buyerId: req.userId, isDeletedByBuyer: false },
+                    { sellerId: req.userId, isDeletedBySeller: false },
                 ],
             },
             orderBy: { createdAt: 'desc' },
             include: {
-                buyer: { select: { username: true, firstName: true, lastName: true } },
-                seller: { select: { username: true, firstName: true, lastName: true } },
+                buyer: { select: { username: true, firstName: true, lastName: true, photo: true } },
+                seller: { select: { username: true, firstName: true, lastName: true, photo: true } },
             },
         });
 
@@ -110,8 +111,8 @@ export const getEscrowDetails = async (req: AuthRequest, res: Response) => {
         const escrow = await prisma.escrow.findUnique({
             where: { id },
             include: {
-                buyer: { select: { username: true, firstName: true, lastName: true, email: true } },
-                seller: { select: { username: true, firstName: true, lastName: true } },
+                buyer: { select: { username: true, firstName: true, lastName: true, email: true, photo: true } },
+                seller: { select: { username: true, firstName: true, lastName: true, photo: true } },
                 transactions: true,
             },
         });
@@ -256,6 +257,17 @@ export const updateEscrowStatus = async (req: AuthRequest, res: Response) => {
             where: { id: idStr },
             data: { status },
         });
+
+        if (status === 'REJECTED') {
+            const otherPartyId = req.userId === escrow.buyerId ? escrow.sellerId : escrow.buyerId;
+            const role = req.userId === escrow.buyerId ? 'Buyer' : 'Seller';
+            await createNotification(
+                otherPartyId,
+                'Escrow Rejected',
+                `The ${role} has rejected the escrow "${escrow.title}".`,
+                'ERROR'
+            );
+        }
 
         res.json({
             message: 'Escrow status updated',
@@ -481,6 +493,48 @@ export const raiseDispute = async (req: AuthRequest, res: Response) => {
         });
     } catch (error) {
         console.error('Raise dispute error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+export const deleteEscrow = async (req: AuthRequest, res: Response) => {
+    try {
+        const id = req.params['id'] as string;
+        const escrow = await prisma.escrow.findUnique({
+            where: { id },
+        });
+
+        if (!escrow) {
+            return res.status(404).json({ message: 'Escrow not found' });
+        }
+
+        if (escrow.buyerId !== req.userId && escrow.sellerId !== req.userId) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+
+        // Only allow deletion for specific statuses (REJECTED, COMPLETED, RELEASED, CANCELLED)
+        const allowedStatuses = ['REJECTED', 'COMPLETED', 'RELEASED', 'CANCELLED'];
+        if (!allowedStatuses.includes(escrow.status.toUpperCase())) {
+            return res.status(400).json({
+                message: `You can only delete transactions that are ${allowedStatuses.join(', ')}`
+            });
+        }
+
+        if (escrow.buyerId === req.userId) {
+            await prisma.escrow.update({
+                where: { id },
+                data: { isDeletedByBuyer: true },
+            });
+        } else {
+            await prisma.escrow.update({
+                where: { id },
+                data: { isDeletedBySeller: true },
+            });
+        }
+
+        res.json({ message: 'Escrow hidden from view' });
+    } catch (error) {
+        console.error('Delete escrow error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };
