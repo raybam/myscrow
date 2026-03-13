@@ -12,9 +12,12 @@ import notificationRoutes from './routes/notificationRoutes';
 import supportRoutes from './routes/supportRoutes';
 import adminRoutes from './routes/adminRoutes';
 
+import { clerkMiddleware } from '@clerk/express';
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(clerkMiddleware());
 app.use(helmet());
 app.use(cors());
 app.use(morgan('dev'));
@@ -36,8 +39,12 @@ app.get('/health', (req: Request, res: Response) => {
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: any) => {
-    console.error(err.stack);
-    res.status(500).json({ message: 'Something went wrong!' });
+    console.error('[Global Error]', err);
+    if (err.stack) console.error(err.stack);
+    res.status(500).json({
+        message: 'Internal Server Error',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
 });
 
 import { startCronJobs } from './services/cronService';

@@ -1,20 +1,14 @@
 import { Router } from 'express';
-import { register, login, forgotPassword, resetPassword, sendVerificationOtp, verifyEmail, googleLogin } from '../controllers/authController';
+import { authenticate } from '../middleware/auth';
+import { setPin, changePin, syncUser } from '../controllers/authController';
 
 const router = Router();
 
-router.post('/register', register);
-router.post('/login', login);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
-router.post('/google-login', googleLogin);
+// Used to sync Clerk user with local database profile
+router.get('/sync', authenticate, syncUser);
 
-import { authenticate } from '../middleware/auth';
-import { setPin, changePin } from '../controllers/authController';
-
+// PIN Management (requires authentication via Clerk token)
 router.post('/pin/set', authenticate, setPin);
 router.post('/pin/change', authenticate, changePin);
-router.post('/otp/send', authenticate, sendVerificationOtp);
-router.post('/otp/verify', authenticate, verifyEmail);
 
 export default router;
